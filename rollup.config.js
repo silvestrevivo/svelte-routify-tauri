@@ -1,10 +1,13 @@
-import svelte from 'rollup-plugin-svelte';
+import svelte from 'rollup-plugin-svelte-hot';
+import Hmr from 'rollup-plugin-hot'
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import livereload from 'rollup-plugin-livereload';
 import { terser } from 'rollup-plugin-terser';
 import copy from 'rollup-plugin-copy'
 import del from 'del'
+
+
 
 const staticDir = 'static'
 const distDir = 'dist'
@@ -13,7 +16,15 @@ const production = !process.env.ROLLUP_WATCH;
 const bundling = process.env.BUNDLING || production ? 'dynamic' : 'bundle'
 const shouldPrerender = (typeof process.env.PRERENDER !== 'undefined') ? process.env.PRERENDER : !!production
 
+
 del.sync(distDir + '/**')
+
+const hot = !production
+
+const hmr = hot && Hmr({
+	inMemory: true,
+	public: 'static',
+})
 
 function createConfig({ output, inlineDynamicImports, plugins = [] }) {
   const transform = inlineDynamicImports ? bundledTransform : dynamicTransform
@@ -29,7 +40,7 @@ function createConfig({ output, inlineDynamicImports, plugins = [] }) {
     plugins: [
       copy({
         targets: [
-          { src: [staticDir + "/*", "!*/(__index.html)"], dest: distDir },
+          { src: staticDir + '/**/!(__index.html)', dest: distDir },
           { src: `${staticDir}/__index.html`, dest: distDir, rename: '__app.html', transform },
         ],
 	copyOnce: true,
@@ -43,7 +54,8 @@ function createConfig({ output, inlineDynamicImports, plugins = [] }) {
         // a separate file — better for performance
         css: css => {
           css.write(`${buildDir}/bundle.css`);
-        }
+        },
+				hot,
       }),
 
       // If you have external dependencies installed from
@@ -62,7 +74,9 @@ function createConfig({ output, inlineDynamicImports, plugins = [] }) {
       // instead of npm run dev), minify
       production && terser(),
 
-      ...plugins
+      ...plugins,
+
+			hmr,
     ],
     watch: {
       clearScreen: false
@@ -79,7 +93,7 @@ const bundledConfig = {
   },
   plugins: [
     !production && serve(),
-    !production && livereload(distDir)
+    // !production && livereload(distDir)
   ]
 }
 
